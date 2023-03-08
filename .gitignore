@@ -41,6 +41,8 @@ results*.csv
 coco/
 coco128/
 VOC/
+kitty/
+kitty_test/
 nuscenes/
 
 coco2017labels-segments.zip

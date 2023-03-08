@@ -173,7 +173,9 @@ class ONNX_ORT(nn.Module):
     def forward(self, x):
         boxes = x[:, :, :4]
         conf = x[:, :, 4:5]
-        scores = x[:, :, 5:]
+        # Add dist for distyolo
+        dist = x[:, :, 5:6]
+        scores = x[:, :, 6:]
         if self.n_classes == 1:
             scores = conf # for models with one class, cls_loss is 0 and cls_conf is always 0.5,
                                  # so there is no need to multiplicate.
@@ -189,8 +191,11 @@ class ONNX_ORT(nn.Module):
         selected_boxes = boxes[X, Y, :]
         selected_categories = category_id[X, Y, :].float()
         selected_scores = max_score[X, Y, :]
+        # select dist
+        selected_dist = dist[X, Y, :]
         X = X.unsqueeze(1).float()
-        return torch.cat([X, selected_boxes, selected_categories, selected_scores], 1)
+        # Change order to (box, conf, dist, cls)
+        return torch.cat([selected_boxes, selected_scores, selected_dist, selected_categories], 1)
 
 class ONNX_TRT(nn.Module):
     '''onnx module with TensorRT NMS operation.'''

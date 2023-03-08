@@ -83,7 +83,9 @@ def torch2onnx():
     onnx_path = opt.name
 
     # to onnx
-    torch.onnx.export(model, img, onnx_path, verbose=False, input_names=input_names, output_names=output_names)
+    # opset_version=11 for jetson nano
+    torch.onnx.export(model, img, onnx_path, verbose=False, input_names=input_names, 
+                      output_names=output_names, opset_version=11)
 
     # test onnx
     img = np.array([tmp], dtype=np.float32)
@@ -99,12 +101,12 @@ def onnxtest():
     path, img, img0 = LoadImage(opt.test_input, opt.img_size, 32)
     img = np.array([img], dtype=np.float32)
     img /= 255.0
-    onnx_path = "./runs/onnx/distyolo.onnx"
+    onnx_path = opt.weights[0]
     model = onnx.load(onnx_path)
     ort_session = ort.InferenceSession(onnx_path)
-    outputs = ort_session.run(None, {'input' : img})
+    pred = ort_session.run(None, {'images' : img})[0]
 
-    pred = non_max_suppression(torch.from_numpy(outputs[0]).to(torch.device('cuda:0')), 0.45, 0.25)
+    # pred = non_max_suppression(torch.from_numpy(pred).to(torch.device('cuda:0')), 0.45, 0.25)
     print('onnx result:', pred)
 
 if __name__ == '__main__':
@@ -117,7 +119,11 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='0')
     parser.add_argument('--project', default='runs/onnx')
     parser.add_argument('--name', default='exp')
+    parser.add_argument('--test', action='store_true', help='test onnx file')
     opt = parser.parse_args()
     print(opt)
 
-    torch2onnx()
+    if opt.test:
+        onnxtest()
+    else:
+        torch2onnx()
