@@ -79,9 +79,9 @@ def trt_detect():
     # Initialize for statistic
     # dist_size = [0 for _ in range(15)]
     total_target = 0
-    target_per_dist = np.array([0 for _ in range(150)])
+    target_per_dist = np.array([0 for _ in range(200)])
     total_error = 0
-    error_per_dist = np.array([0 for _ in range(150)], dtype=float)
+    error_per_dist = np.array([0 for _ in range(200)], dtype=float)
     error_per_cls = np.array([0 for _ in names], dtype=float)
     target_per_cls = np.array([0 for _ in names])
 
@@ -117,6 +117,7 @@ def trt_detect():
 
         # reshape and remove duplicate
         pred = np.unique(host_out.reshape(engine.get_binding_shape(1)), axis=0)
+        print(pred)
         t2 = time.time()
 
         # Load ground truth
@@ -134,7 +135,7 @@ def trt_detect():
 
                 # Rescale dist
                 list[5] = float(list[5])
-                list[5] *= 150
+                # list[5] *= 150
                 gt.append(list)
 
         # Process detections
@@ -142,14 +143,14 @@ def trt_detect():
         save_path = str(save_dir / p.name)
         
         # Rescale boxes from img_size to img0 size
-        det = torch.from_numpy(pred)
+        det = torch.from_numpy(pred).float()
         det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
 
         # Print result on image and save
         for *xyxy, conf, dist, cls in reversed(det):
-            label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist*150:.2f}m'
+            label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist:.2f}m'
             plot_one_box(xyxy, img0, label=label, color=colors[int(cls)], line_thickness=1)
-            dist = dist.cpu()*150
+            dist = dist.cpu()
             # Statistic with ground truth
             for l in gt:
                 if iou(xyxy, l[1:5]) > 0.5 and int(cls) == int(l[0]):
@@ -170,22 +171,40 @@ def trt_detect():
             total_time += t2 - t1
 
         img_idx += 1
+   
     # Plot result
     total_error /= total_target
     error_per_dist /= target_per_dist
     error_per_cls /= target_per_cls
+
+    s_path = opt.stat_path
+    # 
+    plt.figure(figsize=(15,3))
     plt.bar(names, error_per_cls)
-    plt.savefig("./kitty_test/trt/error-cls.png")
+    plt.savefig(s_path + "error-cls.png")
     plt.clf()
-    # print([i*10 for i in range(15)])
-    plt.bar([i*1 for i in range(150)], error_per_dist)
-    plt.savefig("./kitty_test/trt/error-dist-150.png")
+    #
+    plt.figure(figsize=(15,3))
+    plt.bar([i*1 for i in range(200)], error_per_dist)
+    plt.savefig(s_path + "error-dist-200.png")
     plt.clf()
-    plt.bar([i*1 for i in range(150)], target_per_dist)
-    plt.savefig("./kitty_test/torch/target-dist-150.png")
+    #
+    plt.figure(figsize=(15,3))
+    plt.bar([i*1 for i in range(200)], target_per_dist)
+    plt.savefig(s_path + "target-dist-200.png")
+
     print(f"total average error : {total_error}")
     print(f'Done. ({(1E3 * (total_time)):.1f}ms) total Inference and NMS')
     print(f'Done. ({(1E3 * (total_time/total_image)):.1f}ms) average time Inference and NMS')
+
+    # save on txt
+    with open(s_path + 'summry.txt', 'w') as f:
+        f.write(f'target per dist:\n{target_per_dist}\n')
+        f.write(f'error per dist:\n{error_per_dist}\n')
+        f.write(f'target per cls:\n{target_per_cls}\n')
+        f.write(f'error per cls:\n{error_per_cls}\n')
+        f.write(f'average error:\n{total_error}\n')
+        f.write(f'average runtime:\n{(1E3 * (total_time/total_image)):.1f}ms')
 
 
 if __name__ == '__main__':
@@ -198,8 +217,12 @@ if __name__ == '__main__':
     parser.add_argument('--datatype', default=float)
     parser.add_argument('--project', default='runs/detect')
     parser.add_argument('--name', default='exp-trt')
+    parser.add_argument('--stat-path', help='statistic save path (end with /)')
     opt = parser.parse_args()
-    opt.datatype = np.float32
+    opt.datatype = np.float16
     print(opt)
+
+    if not os.path.exists(opt.stat_path):
+        os.mkdir(opt.stat_path)
 
     trt_detect()

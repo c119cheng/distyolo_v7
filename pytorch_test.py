@@ -88,7 +88,8 @@ def iou(bbox1, bbox2):
     a_area = (bbox1[2] - bbox1[0]) * (bbox1[3] - bbox1[1])
     b_area = (bbox2[2] - bbox2[0]) * (bbox2[3] - bbox2[1])
     ab_union = a_area+b_area-overlap_area
-
+    if ab_union == 0:
+        return 0
     return float(overlap_area)/float(ab_union)
 
 
@@ -136,9 +137,9 @@ def detect(save_img=False):
     # Initialize for statistic
     # dist_size = [0 for _ in range(15)]
     total_target = 0
-    target_per_dist = np.array([0 for _ in range(150)])
+    target_per_dist = np.array([0 for _ in range(200)])
     total_error = 0
-    error_per_dist = np.array([0 for _ in range(150)], dtype=float)
+    error_per_dist = np.array([0 for _ in range(200)], dtype=float)
     error_per_cls = np.array([0 for _ in names], dtype=float)
     target_per_cls = np.array([0 for _ in names])
 
@@ -186,7 +187,7 @@ def detect(save_img=False):
 
                 # Rescale dist
                 list[5] = float(list[5])
-                list[5] *= 150
+                # list[5] *= 150
                 gt.append(list)
 
         # Process detections
@@ -199,9 +200,12 @@ def detect(save_img=False):
 
             # Print result on image and save
             for *xyxy, conf, dist, cls in reversed(det):
-                label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist*150:.2f}m'
+                # Rescale dist
+                # dist = dist*150
+
+                label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist:.2f}m'
                 plot_one_box(xyxy, img0, label=label, color=colors[int(cls)], line_thickness=1)
-                dist = dist.cpu()*150
+                dist = dist.cpu()
                 # Statistic with ground truth
                 for l in gt:
                     if iou(xyxy, l[1:5]) > 0.5 and int(cls) == int(l[0]):
@@ -226,18 +230,35 @@ def detect(save_img=False):
     total_error /= total_target
     error_per_dist /= target_per_dist
     error_per_cls /= target_per_cls
+
+    s_path = opt.stat_path
+    # 
+    plt.figure(figsize=(15,3))
     plt.bar(names, error_per_cls)
-    plt.savefig("./kitty_test/torch/error-cls.png")
+    plt.savefig(s_path + "error-cls.png")
     plt.clf()
-    # print([i*10 for i in range(15)])
-    plt.bar([i*1 for i in range(150)], error_per_dist)
-    plt.savefig("./kitty_test/torch/error-dist-150.png")
+    #
+    plt.figure(figsize=(15,3))
+    plt.bar([i*1 for i in range(200)], error_per_dist)
+    plt.savefig(s_path + "error-dist-200.png")
     plt.clf()
-    plt.bar([i*1 for i in range(150)], target_per_dist)
-    plt.savefig("./kitty_test/torch/target-dist-150.png")
+    #
+    plt.figure(figsize=(15,3))
+    plt.bar([i*1 for i in range(200)], target_per_dist)
+    plt.savefig(s_path + "target-dist-200.png")
+
     print(f"total average error : {total_error}")
     print(f'Done. ({(1E3 * (total_time)):.1f}ms) total Inference and NMS')
     print(f'Done. ({(1E3 * (total_time/total_image)):.1f}ms) average time Inference and NMS')
+
+    # save on txt
+    with open(s_path + 'summry.txt', 'w') as f:
+        f.write(f'target per dist:\n{target_per_dist}\n')
+        f.write(f'error per dist:\n{error_per_dist}\n')
+        f.write(f'target per cls:\n{target_per_cls}\n')
+        f.write(f'error per cls:\n{error_per_cls}\n')
+        f.write(f'average error:\n{total_error}\n')
+        f.write(f'average runtime:\n{(1E3 * (total_time/total_image)):.1f}ms')
     exit()
 
 if __name__ == '__main__':
@@ -250,7 +271,11 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='0')
     parser.add_argument('--project', default='runs/detect')
     parser.add_argument('--name', default='exp')
+    parser.add_argument('--stat-path', help='statistic save path (end with /)')
     opt = parser.parse_args()
     print(opt)
+
+    if not os.path.exists(opt.stat_path):
+        os.mkdir(opt.stat_path)
 
     detect()
