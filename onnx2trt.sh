@@ -12,4 +12,4 @@ export PATH
 # read -p "Please input output engine name:" engine
 echo "\nConvert $1 to $2"
 
-/usr/src/tensorrt/bin/trtexec --onnx=$1 --saveEngine=$2 
+/usr/src/tensorrt/bin/trtexec --onnx=$1 --saveEngine=$2 --best
