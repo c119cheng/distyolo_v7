@@ -34,5 +34,6 @@ see convert-onnx-step.txt
 
 ## onnx -> tensorrt
 ```bash
+    # run on jetson-nano
     $ source onnx2trt.sh best-nms.onnx best.trt
 ```
