@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE" #這是Fan本地解決某些非程式錯誤加入的代碼
 from pathlib import Path
 from threading import Thread
 
@@ -9,6 +8,7 @@ import numpy as np
 import torch
 import yaml
 from tqdm import tqdm
+
 
 from models.experimental import attempt_load
 from utils.datasets import create_dataloader
@@ -102,7 +102,6 @@ def test(data,
     p, r, f1, mp, mr, map50, map, t0, t1 = 0., 0., 0., 0., 0., 0., 0., 0., 0.
     loss = torch.zeros(3, device=device)
     jdict, stats, ap, ap_class, wandb_images = [], [], [], [], []
-    distance_pair = [] #紀錄預測正確(iou>0.5)物件的(class,target_distnace,predict_distance)
     for batch_i, (img, targets, paths, shapes) in enumerate(tqdm(dataloader, desc=s)): #targets現在每一列是(0,class,x,y,w,h,distance)
         img = img.to(device, non_blocking=True)
         img = img.half() if half else img.float()  # uint8 to fp16/32
@@ -116,7 +115,7 @@ def test(data,
             out, train_out = model(img, augment=augment)  # inference and training outputs 得到三種prediction(?)
             t0 += time_synchronized() - t
 
-            # Compute loss 單獨測試時不用管compute loss
+            # Compute loss
             if compute_loss:
                 loss += compute_loss([x.float() for x in train_out], targets)[1][:3]  # box, obj, cls
 
@@ -129,7 +128,8 @@ def test(data,
             out = non_max_suppression(out, conf_thres=conf_thres, iou_thres=iou_thres, labels=lb, multi_label=True)
             t1 += time_synchronized() - t
 
-        #labels 每列是(class , x,y, w, h ,dist) target是golden answer out是predice answer
+        #labels 每列是(class , x,y, w, h, conf ,dist)
+        # labels 每列是(class, x, y, w, h, dist) by Cheng
         # Statistics per image
         for si, pred in enumerate(out):
             labels = targets[targets[:, 0] == si, 1:]
@@ -145,16 +145,15 @@ def test(data,
 
             # Predictions
             predn = pred.clone()
+            # predn = (?, (x1, y1, x2, y2, conf, dist, ...))
             scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
 
             # Append to text file
-            if save_txt: #有改動 可以寫出距離資訊
+            if save_txt:
                 gn = torch.tensor(shapes[si][0])[[1, 0, 1, 0]]  # normalization gain whwh
-                #for *xyxy, conf, cls in predn.tolist(): #增加可寫入dist的部分 注意 寫入的dist可能還沒scaling回來
-                for *xyxy, conf, dist, cls in predn.tolist(): 
+                for *xyxy, conf, cls in predn.tolist():
                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                    #line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
-                    line = (cls, *xywh, conf, dist) if save_conf else (cls, *xywh, dist)  # label format
+                    line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
                     with open(save_dir / 'labels' / (path.stem + '.txt'), 'a') as f:
                         f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
@@ -186,35 +185,31 @@ def test(data,
             correct = torch.zeros(pred.shape[0], niou, dtype=torch.bool, device=device)
             if nl:
                 detected = []  # target indices
-                tcls_tensor = labels[:, 0] #labels是ground truth
+                tcls_tensor = labels[:, 0]
 
                 # target boxes
                 tbox = xywh2xyxy(labels[:, 1:5])
                 scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
-                if plots: #把plots調off就不用擔心這個地方報錯了 
+                if plots and 0:
                     confusion_matrix.process_batch(predn, torch.cat((labels[:, 0:1], tbox), 1))
 
-                # Per target class 
-                # 原本for迴圈裡面做的只有比對target和predict 將那些predict中iou和target有超過threshold者判定為真 
-                # 新增紀錄被判定為真的那些pred的距離和ground truth距離以及對應類別的部分
+                # Per target class
                 for cls in torch.unique(tcls_tensor):
                     ti = (cls == tcls_tensor).nonzero(as_tuple=False).view(-1)  # prediction indices
                     #pi = (cls == pred[:, 5]).nonzero(as_tuple=False).view(-1)  # target indices
                     pi = (cls == pred[:, 6]).nonzero(as_tuple=False).view(-1)  # target indices #pred的每列是(X,Y,W,H,CONF,dist,class)
-                    #print(pi.shape) #以防萬一
+                    
 
                     # Search for detections
                     if pi.shape[0]:
                         # Prediction to target ious
-                        ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices #跟dist無關
+                        ious, i = box_iou(predn[pi, :4], tbox[ti]).max(1)  # best ious, indices
 
                         # Append detections
                         detected_set = set()
-                        for j in (ious > iouv[0]).nonzero(as_tuple=False): #iouv是threshold 0.5到0.95切10等分
+                        for j in (ious > iouv[0]).nonzero(as_tuple=False):
                             d = ti[i[j]]  # detected target
-                            my_p = pi[i[j]] #取得索引
                             if d.item() not in detected_set:
-                                distance_pair.append([cls, labels[d,5],predn[my_p,5],"EOL"]) #append必要資訊
                                 detected_set.add(d.item())
                                 detected.append(d)
                                 correct[pi[j]] = ious[j] > iouv  # iou_thres is 1xn
@@ -233,9 +228,6 @@ def test(data,
             f = save_dir / f'test_batch{batch_i}_pred.jpg'  # predictions
             Thread(target=plot_images, args=(img, output_to_target(out), paths, f, names), daemon=True).start()
 
-    #檢測distance_pair的正確性
-    print(distance_pair)
-    
     # Compute statistics 暫時忽略dist來計算AP (不更動此段程式碼)
     stats = [np.concatenate(x, 0) for x in zip(*stats)]  # to numpy 
     if len(stats) and stats[0].any():
