@@ -20,7 +20,7 @@ from utils.plots import plot_one_box
 from utils.torch_utils import time_synchronized
 
 from yolo2onnx import LoadImage
-from kitty_test import rescale, iou
+from pytorch_test import rescale, iou
 # Reference 
 # https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#build_engine_python
 # https://blog.csdn.net/irving512/article/details/115403888
@@ -63,7 +63,11 @@ def trt_detect():
     (save_dir).mkdir(parents=True, exist_ok=True)
 
     # names and color
-    names = [ 'person', 'car', 'van', 'truck', 'person-sit', 'bcycle', 'train']
+    if opt.source.replace('val.txt', '') == './nuscenes/':
+        print('nuscenes')
+        names = [ 'pedestrian', 'animal', 'car', 'motorcycle', 'bicycle', 'bus', 'truck', 'construction', 'emergency', 'trailer', 'barrier', 'trafficcone', 'pushable_pullable', 'debris', 'bicycle_rack']
+    else:
+        names = [ 'person', 'car', 'van', 'truck', 'person-sit', 'bcycle', 'train']
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
 
     # process file name
@@ -148,6 +152,7 @@ def trt_detect():
 
         # Print result on image and save
         for *xyxy, conf, dist, cls in reversed(det):
+            print(img_path)
             label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist:.2f}m'
             plot_one_box(xyxy, img0, label=label, color=colors[int(cls)], line_thickness=1)
             dist = dist.cpu()
@@ -219,7 +224,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp-trt')
     parser.add_argument('--stat-path', help='statistic save path (end with /)')
     opt = parser.parse_args()
-    opt.datatype = np.float16
+    # opt.datatype = np.float32
     print(opt)
 
     if not os.path.exists(opt.stat_path):
