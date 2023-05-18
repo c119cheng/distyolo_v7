@@ -44,10 +44,14 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scale
 
 def LoadImage(path, img_size, stride):
     img0 = cv2.imread(path)
-    img = letterbox(img0, stride=stride)[0]
+    img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
+    img0 = cv2.resize(img0, (640, 480))
+    img = letterbox(img0, new_shape=img_size, stride=stride)[0]
 
     # Convert
-    img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
+    # img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
+    img = [img]
+    print(img[0].shape)
     img = np.ascontiguousarray(img)
 
     return path, img, img0
@@ -92,6 +96,9 @@ def torch2onnx():
     img /= 255.0
     
     model = onnx.load(onnx_path)
+    import onnxsim
+    model, check = onnxsim.simplify(model)
+    onnx.save(model, onnx_path)
     ort_session = ort.InferenceSession(onnx_path)
     outputs = ort_session.run(None, {'input' : img})
 
@@ -100,6 +107,7 @@ def torch2onnx():
 def onnxtest():
     path, img, img0 = LoadImage(opt.test_input, opt.img_size, 32)
     img = np.array([img], dtype=np.float32)
+    print(img.shape)
     img /= 255.0
     onnx_path = opt.weights[0]
     model = onnx.load(onnx_path)
@@ -113,7 +121,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, help='model.pt path')
     parser.add_argument('--test-input', type=str, help='input image')
-    parser.add_argument('--img-size', type=int, default=640, help='image size')
+    parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='image size')
     parser.add_argument('--conf-thres', type=float, default=0.25)
     parser.add_argument('--iou-thres', type=float, default=0.45)
     parser.add_argument('--device', default='0')

@@ -52,12 +52,14 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scale
 
 def LoadImage(path, img_size, stride):
     img0 = cv2.imread(path)
+    img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
     img = letterbox(img0, stride=stride)[0]
 
     # Convert
-    img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = [img]
+    # img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
     img = np.ascontiguousarray(img)
-
     return path, img, img0
 
 def rescale(list, X, Y):
