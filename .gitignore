@@ -44,6 +44,7 @@ VOC/
 kitty/
 kitty_test/
 nuscenes/
+arc_nuscenes/
 
 coco2017labels-segments.zip
 test2017.zip

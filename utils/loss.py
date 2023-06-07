@@ -424,12 +424,13 @@ class MyDistLoss(nn.Module): #自定義的距離損失函數
 
     def forward(self,pred,ground_truth):
         # change by Cheng with normalize loss
-        # self.func = nn.MSELoss(reduction='sum')
-        ones = torch.ones_like(pred)
+        self.func = nn.MSELoss(reduction='sum')
+        # ones = torch.ones_like(pred)
         # print(pred.shape)
         
-        return torch.sum(((pred - ground_truth) ** 2 + ones) / (ground_truth + ones))
-        # return self.func(pred,ground_truth)
+        # return torch.sum(((pred - ground_truth) ** 2 + ones) / (ground_truth + ones))
+        
+        return self.func(pred,ground_truth)
 
 class ComputeLoss:
     # Compute losses

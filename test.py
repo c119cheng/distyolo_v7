@@ -128,7 +128,7 @@ def test(data,
             out = non_max_suppression(out, conf_thres=conf_thres, iou_thres=iou_thres, labels=lb, multi_label=True)
             t1 += time_synchronized() - t
 
-        #labels 每列是(class , x,y, w, h, conf ,dist)
+
         # labels 每列是(class, x, y, w, h, dist) by Cheng
         # Statistics per image
         for si, pred in enumerate(out):
@@ -145,7 +145,7 @@ def test(data,
 
             # Predictions
             predn = pred.clone()
-            # predn = (?, (x1, y1, x2, y2, conf, dist, ...))
+            # predn = (?, (x1, y1, x2, y2, conf, dist, cls))
             scale_coords(img[si].shape[1:], predn[:, :4], shapes[si][0], shapes[si][1])  # native-space pred
 
             # Append to text file
@@ -190,7 +190,7 @@ def test(data,
                 # target boxes
                 tbox = xywh2xyxy(labels[:, 1:5])
                 scale_coords(img[si].shape[1:], tbox, shapes[si][0], shapes[si][1])  # native-space labels
-                if plots and 0:
+                if plots:
                     confusion_matrix.process_batch(predn, torch.cat((labels[:, 0:1], tbox), 1))
 
                 # Per target class
