@@ -69,6 +69,7 @@ def detect():
     # trace model
     model = TracedModel(model, device, opt.img_size)
     
+
     # Get names and colors
     names = model.module.names if hasattr(model, 'module') else model.names
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
@@ -80,7 +81,7 @@ def detect():
     fps = int(round(cap.get(cv2.CAP_PROP_FPS)))
     print(fps, width, height)
     fourcc = cv2.VideoWriter_fourcc(*'MPEG')
-    out = cv2.VideoWriter(str(save_dir / 'out.mp4'), fourcc, fps, (width, height))
+    out = cv2.VideoWriter(str(save_dir / 'out_letterbox.mp4'), fourcc, fps, (width, height))
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -88,12 +89,14 @@ def detect():
             break
         # print(frame.shape)
         frame0 = frame
-        frame = letterbox(frame0, stride=32, new_shape=(640, 640))[0]
-        frame = frame.transpose(2, 0, 1)
-        frame = torch.from_numpy(np.array([frame])).to(device)
+        frame = letterbox(frame0, stride=32, new_shape=(320, 320))[0]
+        # frame = cv2.resize(frame0, (320,320))
+        # change transpose to cvtColor for gray image and add another shape
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #　frame = frame.transpose(2, 0, 1)
+        frame = torch.from_numpy(np.array([[frame]])).to(device)
         frame = frame.float()
         frame /= 255.0
-
         # Inference
         t1 = time_synchronized()
         with torch.no_grad():   # Calculating gradients would cause a GPU memory leak
@@ -135,7 +138,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--img-size', type=int, default=640, help='image size')
     parser.add_argument('--conf-thres', type=float, default=0.25)
-    parser.add_argument('--iou-thres', type=float, default=0.45)
+    parser.add_argument('--iou-thres', type=float, default=0.35)
     parser.add_argument('--device', default='0')
     parser.add_argument('--save', default='video/')
 

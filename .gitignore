@@ -45,6 +45,8 @@ kitty/
 kitty_test/
 nuscenes/
 arc_nuscenes/
+tflm_model/
+tmp/
 
 coco2017labels-segments.zip
 test2017.zip

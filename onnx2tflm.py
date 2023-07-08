@@ -5,7 +5,7 @@ import tensorflow as tf
 import cv2
 import numpy as np
 
-def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
+def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=False, scaleFill=False, scaleup=True, stride=32):
     # Resize and pad image while meeting stride-multiple constraints
     shape = img.shape[:2]  # current shape [height, width]
     if isinstance(new_shape, int):
@@ -40,23 +40,24 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scale
 converter = tf.lite.TFLiteConverter.from_saved_model('tflm-gray')
 converter.optimizations = [tf.lite.Optimize.DEFAULT]
 converter.target_spec.supported_ops = [
-    tf.lite.OpsSet.TFLITE_BUILTINS
+    tf.lite.OpsSet.TFLITE_BUILTINS_INT8
     # tf.lite.OpsSet.SELECT_TF_OPS
 ]
+converter.inference_input_type = tf.uint8
+converter.inference_output_type = tf.float16
 
 # converter.experimental_new_quantizer = True
 def representative_dataset_gen():
     for _ in range(10):
         input = cv2.imread('./nuscenes/new.jpg')
-        img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
-        input = cv2.resize(input, (640, 480))
-        input = letterbox(input, stride=32)[0]
-        img = [img]
+        input = cv2.cvtColor(input, cv2.COLOR_BGR2GRAY)
+        input = letterbox(input, (256, 320), stride=32)[0]
+        input = input.reshape(256, 320, 1)
         # img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
-        img = np.ascontiguousarray(img)
+        # img = np.ascontiguousarray(img)
         yield [input.astype(np.float32)]
 
-# converter.representative_dataset = representative_dataset_gen
+converter.representative_dataset = representative_dataset_gen
 tflite_model = converter.convert()
 with tf.io.gfile.GFile('distyolo-gray-INT8.tflite', 'wb') as f:
     f.write(tflite_model)

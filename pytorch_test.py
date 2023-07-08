@@ -17,6 +17,7 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
+from my_testing import MyTester
 
 def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
     # Resize and pad image while meeting stride-multiple constraints
@@ -52,14 +53,14 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scale
 
 def LoadImage(path, img_size, stride):
     img0 = cv2.imread(path)
-    img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
+    # img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
     img = letterbox(img0, stride=stride)[0]
 
     # Convert
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img = [img]
     # img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
-    img = np.ascontiguousarray(img)
+    # img = np.ascontiguousarray(img)
     return path, img, img0
 
 def rescale(list, X, Y):
@@ -149,6 +150,10 @@ def detect(save_img=False):
     total_time = 0
     # Start process per image
     img_idx = 0
+
+    # for tester
+    all_gt = []
+    all_pred = []
     for line in file:
 
         img_path = base + line[2:].replace("\n", "")
@@ -184,33 +189,39 @@ def detect(save_img=False):
             for line in f:
                 list = line.split(' ')
                 list[0] = int(list[0])
+                tcls = list[0]
                 # Rescale bbox and change from xywh2xyxy
-                list[1:5] = rescale(list[1:5], X, Y)
+                list[0:4] = rescale(list[1:5], X, Y)
 
                 # Rescale dist
-                list[5] = float(list[5])
+                list[5] = float(list[5]) * 30
+                # list[5] = float(list[5])
                 # list[5] *= 150
+                list[4] = tcls
                 gt.append(list)
-
+        all_gt.append(np.array(gt))
+        
+        pred_test = []
         # Process detections
         for i, det in enumerate(pred):
             p = Path(img_path)
             save_path = str(save_dir / p.name)
-            
             # Rescale boxes from img_size to img0 size
             det[:, :4] = scale_coords(img.shape[2:], det[:, :4], img0.shape).round()
-
+            det[:, 5] *= 30
+            for tmp in det:
+                pred_test.append(tmp.detach().cpu().numpy())
+            continue
             # Print result on image and save
             for *xyxy, conf, dist, cls in reversed(det):
                 # Rescale dist
                 # dist = dist*150
-
                 label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist:.2f}m'
                 plot_one_box(xyxy, img0, label=label, color=colors[int(cls)], line_thickness=1)
-                dist = dist.cpu()
+                # dist = dist.cpu() * 100
                 # Statistic with ground truth
                 for l in gt:
-                    if iou(xyxy, l[1:5]) > 0.5 and int(cls) == int(l[0]):
+                    if iou(xyxy, l[1:5]) > 0.45 and int(cls) == int(l[0]):
                         # print("found")
                         total_target += 1
                         total_error += abs(l[5] - dist)
@@ -218,16 +229,23 @@ def detect(save_img=False):
                         target_per_dist[int(l[5] / 1)] += 1
                         error_per_cls[int(cls)] += abs(l[5] - dist)
                         target_per_cls[int(cls)] += 1
-        cv2.imwrite(save_path, img0)
-        print(f"image save in : {save_path}")
+        all_pred.append(np.array(pred_test))
+        # cv2.imwrite(save_path, img0)
+        # print(f"image save in : {save_path}")
         print(f'Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
         
         # ignore first 10 image for warmup
         if img_idx > 10:
             total_image += 1
             total_time += t3 - t1
-
+            if img_idx > 500:
+                break
         img_idx += 1
+
+    tester = MyTester(all_labels=np.array(all_gt), all_predictions=np.array(all_pred))
+    tester.showResult()
+    print(f'Done. ({(1E3 * (total_time/total_image)):.1f}ms) average time Inference and NMS')
+    return 0
     # Plot result
     total_error /= total_target
     error_per_dist /= target_per_dist
