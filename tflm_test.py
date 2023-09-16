@@ -45,7 +45,9 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=False, scal
 def LoadImage(path, img_size, stride):
     img0 = cv2.imread(path)
     # img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
-    img = letterbox(img0, stride=stride, new_shape=(256, 320))[0]
+    img = fish(img0, 0.25)
+    img0 = cv2.cvtColor(img, cv2.COLOR_BGRA2BGR)
+    img = letterbox(img0, stride=stride)[0]
 
     # Convert
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)

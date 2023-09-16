@@ -9,6 +9,7 @@ import numpy as np
 import sys
 import random
 import matplotlib.pyplot as plt
+from math import sqrt
 
 from models.experimental import attempt_load
 from utils.datasets import LoadStreams, LoadImages
@@ -18,6 +19,70 @@ from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
 from my_testing import MyTester
+
+
+def get_fish_xn_yn(source_x, source_y, radius, distortion):
+    """
+    Get normalized x, y pixel coordinates from the original image and return normalized 
+    x, y pixel coordinates in the destination fished image.
+    :param distortion: Amount in which to move pixels from/to center.
+    As distortion grows, pixels will be moved further from the center, and vice versa.
+    """
+
+    if 1 - distortion*(radius**2) == 0:
+        return source_x, source_y
+
+    return source_x / (1 - (distortion*(radius**2))), source_y / (1 - (distortion*(radius**2)))
+
+
+def fish(img, distortion_coefficient):
+    """
+    :type img: numpy.ndarray
+    :param distortion_coefficient: The amount of distortion to apply.
+    :return: numpy.ndarray - the image with applied effect.
+    """
+
+    # If input image is only BW or RGB convert it to RGBA
+    # So that output 'frame' can be transparent.
+    w, h = img.shape[0], img.shape[1]
+    if len(img.shape) == 2:
+        # Duplicate the one BW channel twice to create Black and White
+        # RGB image (For each pixel, the 3 channels have the same value)
+        bw_channel = np.copy(img)
+        img = np.dstack((img, bw_channel))
+        img = np.dstack((img, bw_channel))
+    if len(img.shape) == 3 and img.shape[2] == 3:
+        print("RGB to RGBA")
+        img = np.dstack((img, np.full((w, h), 255)))
+
+    # prepare array for dst image
+    dstimg = np.zeros_like(img)
+
+    # floats for calcultions
+    w, h = float(w), float(h)
+
+    # easier calcultion if we traverse x, y in dst image
+    for x in range(len(dstimg)):
+        for y in range(len(dstimg[x])):
+
+            # normalize x and y to be in interval of [-1, 1]
+            xnd, ynd = float((2*x - w)/w), float((2*y - h)/h)
+
+            # get xn and yn distance from normalized center
+            rd = sqrt(xnd**2 + ynd**2)
+
+            # new normalized pixel coordinates
+            xdu, ydu = get_fish_xn_yn(xnd, ynd, rd, distortion_coefficient)
+
+            # convert the normalized distorted xdn and ydn back to image pixels
+            xu, yu = int(((xdu + 1)*w)/2), int(((ydu + 1)*h)/2)
+
+            # if new pixel is in bounds copy from source pixel to destination pixel
+            if 0 <= xu and xu < img.shape[0] and 0 <= yu and yu < img.shape[1]:
+                dstimg[x][y] = img[xu][yu]
+
+    return dstimg.astype(np.uint8)
+
 
 def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
     # Resize and pad image while meeting stride-multiple constraints
@@ -53,14 +118,18 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scale
 
 def LoadImage(path, img_size, stride):
     img0 = cv2.imread(path)
-    # img0 = cv2.cvtColor(img0, cv2.COLOR_BGR2GRAY)
+
+    # img0 = fish(img0, 0.1)
+    # img0 = cv2.cvtColor(img0, cv2.COLOR_BGRA2BGR)
     img = letterbox(img0, stride=stride)[0]
 
     # Convert
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img = [img]
+    
     # img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB
     # img = np.ascontiguousarray(img)
+
     return path, img, img0
 
 def rescale(list, X, Y):
@@ -165,6 +234,7 @@ def detect(save_img=False):
 
         # Load image    
         path, img, img0 = LoadImage(img_path, imgsz, stride)
+
         img = torch.from_numpy(np.array([img])).to(device)
         img = img.half() # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -211,17 +281,17 @@ def detect(save_img=False):
             det[:, 5] *= 30
             for tmp in det:
                 pred_test.append(tmp.detach().cpu().numpy())
-            continue
+            # continue
             # Print result on image and save
             for *xyxy, conf, dist, cls in reversed(det):
                 # Rescale dist
                 # dist = dist*150
                 label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist:.2f}m'
-                plot_one_box(xyxy, img0, label=label, color=colors[int(cls)], line_thickness=1)
+                plot_one_box(xyxy, img0, label=label, color=colors[int(cls)], line_thickness=3)
                 # dist = dist.cpu() * 100
                 # Statistic with ground truth
                 for l in gt:
-                    if iou(xyxy, l[1:5]) > 0.45 and int(cls) == int(l[0]):
+                    if iou(xyxy, l[1:5]) > 0.45 and int(cls) == int(l[4]):
                         # print("found")
                         total_target += 1
                         total_error += abs(l[5] - dist)
@@ -231,6 +301,7 @@ def detect(save_img=False):
                         target_per_cls[int(cls)] += 1
         all_pred.append(np.array(pred_test))
         # cv2.imwrite(save_path, img0)
+        
         # print(f"image save in : {save_path}")
         print(f'Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
         
@@ -238,14 +309,14 @@ def detect(save_img=False):
         if img_idx > 10:
             total_image += 1
             total_time += t3 - t1
-            if img_idx > 500:
-                break
+            # if img_idx > 500:
+            #    break
         img_idx += 1
 
     tester = MyTester(all_labels=np.array(all_gt), all_predictions=np.array(all_pred))
     tester.showResult()
     print(f'Done. ({(1E3 * (total_time/total_image)):.1f}ms) average time Inference and NMS')
-    return 0
+    # return 0
     # Plot result
     total_error /= total_target
     error_per_dist /= target_per_dist

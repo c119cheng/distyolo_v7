@@ -45,6 +45,7 @@ kitty/
 kitty_test/
 nuscenes/
 arc_nuscenes/
+nano_nuscenes/
 tflm_model/
 tmp/
 

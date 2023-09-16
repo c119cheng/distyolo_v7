@@ -81,7 +81,7 @@ def detect():
     fps = int(round(cap.get(cv2.CAP_PROP_FPS)))
     print(fps, width, height)
     fourcc = cv2.VideoWriter_fourcc(*'MPEG')
-    out = cv2.VideoWriter(str(save_dir / 'out_letterbox.mp4'), fourcc, fps, (width, height))
+    out = cv2.VideoWriter(str(save_dir / 'out_demo.mp4'), fourcc, fps, (width, height))
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -114,9 +114,9 @@ def detect():
             # Print result on image and save
             for *xyxy, conf, dist, cls in reversed(det):
                 # Rescale dist
-                # dist = dist*150
+                dist = dist
 
-                label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist:.2f}m'
+                label = f'conf:{conf:.2f} dist:{dist:.2f}m'
                 plot_one_box(xyxy, frame0, label=label, color=colors[int(cls)], line_thickness=3)
                 dist = dist.cpu()
         # print(frame0.shape)
@@ -137,7 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--video', type=str)
 
     parser.add_argument('--img-size', type=int, default=640, help='image size')
-    parser.add_argument('--conf-thres', type=float, default=0.25)
+    parser.add_argument('--conf-thres', type=float, default=0.45)
     parser.add_argument('--iou-thres', type=float, default=0.35)
     parser.add_argument('--device', default='0')
     parser.add_argument('--save', default='video/')

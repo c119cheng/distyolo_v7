@@ -125,7 +125,7 @@ def detect(save_img=False):
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
                     if save_img or view_img:  # Add bbox to image
-                        label = f'{names[int(cls)]} conf:{conf:.2f}dist:{distance:.2f}' #加入新的label訊息
+                        label = f'{names[int(cls)]} conf:{conf:.2f}dist:{150*distance:.2f}' #加入新的label訊息
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
             # Print time (inference + NMS)
