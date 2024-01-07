@@ -12,3 +12,6 @@ for nuscenes datasets
 
 convert to onnx
 python3 export.py --weights ./nuscenes/best.pt --grid --end2end --topk-all 100 --iou-thres 0.65 --conf-thres 0.35 --img-size 384 640 --max-wh 640
+
+for logi camera
+python3 export.py --weights ./nuscenes/best.pt --grid --end2end --topk-all 50 --iou-thres 0.65 --conf-thres 0.55 --img-size 480 640 --max-wh 640

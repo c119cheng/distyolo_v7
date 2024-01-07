@@ -152,7 +152,6 @@ def trt_detect():
 
         # Print result on image and save
         for *xyxy, conf, dist, cls in reversed(det):
-            print(img_path)
             label = f'{names[int(cls)]} conf:{conf:.2f} dist:{dist:.2f}m'
             plot_one_box(xyxy, img0, label=label, color=colors[int(cls)], line_thickness=1)
             dist = dist.cpu()
@@ -224,7 +223,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp-trt')
     parser.add_argument('--stat-path', help='statistic save path (end with /)')
     opt = parser.parse_args()
-    # opt.datatype = np.float32
+    opt.datatype = np.float32
     print(opt)
 
     if not os.path.exists(opt.stat_path):
