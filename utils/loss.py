@@ -429,7 +429,8 @@ class MyDistLoss(nn.Module): #自定義的距離損失函數
         # print(pred.shape)
         
         return torch.sum(((pred - ground_truth) ** 2 + ones) / (ground_truth + ones))
-        # return self.func(pred,ground_truth)
+        
+        return self.func(pred,ground_truth)
 
 class ComputeLoss:
     # Compute losses

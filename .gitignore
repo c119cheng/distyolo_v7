@@ -44,6 +44,10 @@ VOC/
 kitty/
 kitty_test/
 nuscenes/
+arc_nuscenes/
+nano_nuscenes/
+tflm_model/
+tmp/
 
 coco2017labels-segments.zip
 test2017.zip
@@ -264,3 +268,7 @@ com_crashlytics_export_strings.xml
 crashlytics.properties
 crashlytics-build.properties
 fabric.properties
+
+
+# cheng
+tflm-gray

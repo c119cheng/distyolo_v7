@@ -1,0 +1,9 @@
+train: ./nano_nuscenes/train.txt  # 
+val: ./nano_nuscenes/val.txt  #
+test: ./nano_nuscenes/test-dev.txt  #
+
+# number of classes
+nc: 4
+
+# class names
+names: [ 'pedestrian', 'car', 'motorcycle', 'truck']

@@ -129,17 +129,20 @@ class IDetect(nn.Module):
             x[i] = self.im[i](x[i])
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85) #把bs,3(number of anchors)*85(之後會+1個距離)*20*20(網格大小)調整shape
             x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
-
+            
             if not self.training:  # inference
                 if self.grid[i].shape[2:4] != x[i].shape[2:4]:
                     self.grid[i] = self._make_grid(nx, ny).to(x[i].device)
 
                 #距離不應該過sigmoid
                 tmp = x[i][...,5]
+                
                 y =  x[i].sigmoid()
                 y[...,5] = tmp
                 y[..., 0:2] = (y[..., 0:2] * 2. - 0.5 + self.grid[i]) * self.stride[i]  # xy
                 y[..., 2:4] = (y[..., 2:4] * 2) ** 2 * self.anchor_grid[i]  # wh
+
+
                 z.append(y.view(bs, -1, self.no))
 
         return x if self.training else (torch.cat(z, 1), x)
@@ -149,8 +152,13 @@ class IDetect(nn.Module):
         z = []  # inference output
         self.training |= self.export
         for i in range(self.nl):
+            # print('fuse forward')
+            # print(f'grid = {self.grid}')
+            # print(f'anchor = {self.anchor_grid}')
+            # exit()
             x[i] = self.m[i](x[i])  # conv
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
+
             x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
 
             if not self.training:  # inference
